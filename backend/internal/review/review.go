@@ -194,10 +194,11 @@ func (e *Engine) Trigger(ctx stdctx.Context, workerID domain.SessionID) (Trigger
 		return TriggerResult{}, err
 	}
 
-	harness, err := e.reviewerHarness(ctx, worker)
+	revCfg, err := e.reviewerConfig(ctx, worker)
 	if err != nil {
 		return TriggerResult{}, err
 	}
+	harness := revCfg.Harness
 
 	now := e.clock()
 	reviewRow, err = e.upsertReview(ctx, worker, harness, reviewRow.ReviewerHandleID, now)
@@ -282,13 +283,13 @@ func (e *Engine) Trigger(ctx stdctx.Context, workerID domain.SessionID) (Trigger
 		}
 	}
 	if handleID == "" {
-		h, err := e.launcher.Spawn(ctx, reviewLaunchSpec(worker, harness, created[0], queue, 0))
+		h, err := e.launcher.Spawn(ctx, reviewLaunchSpec(worker, revCfg, created[0], queue, 0))
 		if err != nil {
 			return TriggerResult{}, failRuns(0, fmt.Errorf("launch reviewer: %w", err))
 		}
 		handleID = h
 	} else {
-		if err := e.launcher.Notify(ctx, handleID, reviewLaunchSpec(worker, harness, created[0], queue, 0)); err != nil {
+		if err := e.launcher.Notify(ctx, handleID, reviewLaunchSpec(worker, revCfg, created[0], queue, 0)); err != nil {
 			return TriggerResult{}, failRuns(0, fmt.Errorf("notify reviewer: %w", err))
 		}
 	}
@@ -302,16 +303,17 @@ func (e *Engine) Trigger(ctx stdctx.Context, workerID domain.SessionID) (Trigger
 	return TriggerResult{Run: created[0], ReviewerHandleID: handleID, Created: true, Reviews: reviews, CreatedRuns: created}, nil
 }
 
-func reviewLaunchSpec(worker domain.SessionRecord, harness domain.ReviewerHarness, run domain.ReviewRun, queue []ports.ReviewTask, index int) LaunchSpec {
+func reviewLaunchSpec(worker domain.SessionRecord, revCfg domain.ReviewerConfig, run domain.ReviewRun, queue []ports.ReviewTask, index int) LaunchSpec {
 	return LaunchSpec{
-		RunID:         run.ID,
-		WorkerID:      worker.ID,
-		Harness:       harness,
-		WorkspacePath: worker.Metadata.WorkspacePath,
-		PRURL:         run.PRURL,
-		TargetSHA:     run.TargetSHA,
-		ReviewQueue:   queue,
-		ReviewIndex:   index,
+		RunID:          run.ID,
+		WorkerID:       worker.ID,
+		Harness:        revCfg.Harness,
+		ReviewerConfig: revCfg,
+		WorkspacePath:  worker.Metadata.WorkspacePath,
+		PRURL:          run.PRURL,
+		TargetSHA:      run.TargetSHA,
+		ReviewQueue:    queue,
+		ReviewIndex:    index,
 	}
 }
 
@@ -374,18 +376,18 @@ func (e *Engine) List(ctx stdctx.Context, workerID domain.SessionID) (SessionRev
 	return SessionReviews{ReviewerHandleID: handle, Runs: runs, Reviews: Plan(prs, runs)}, nil
 }
 
-// reviewerHarness resolves which harness reviews the worker's PR: a configured
-// reviewer wins, otherwise claude-code is used, per domain.ResolveReviewerHarness.
-func (e *Engine) reviewerHarness(ctx stdctx.Context, worker domain.SessionRecord) (domain.ReviewerHarness, error) {
+// reviewerConfig resolves which harness config reviews the worker's PR: a configured
+// reviewer wins, otherwise claude-code with empty cmd/env is returned.
+func (e *Engine) reviewerConfig(ctx stdctx.Context, worker domain.SessionRecord) (domain.ReviewerConfig, error) {
 	var cfg domain.ProjectConfig
 	if e.projects != nil {
 		if proj, ok, err := e.projects.GetProject(ctx, string(worker.ProjectID)); err != nil {
-			return "", err
+			return domain.ReviewerConfig{}, err
 		} else if ok {
 			cfg = proj.Config
 		}
 	}
-	return cfg.ResolveReviewerHarness(worker.Harness), nil
+	return cfg.ResolveReviewerConfig(worker.Harness), nil
 }
 
 func (e *Engine) upsertReview(ctx stdctx.Context, worker domain.SessionRecord, harness domain.ReviewerHarness, handleID string, now time.Time) (domain.Review, error) {

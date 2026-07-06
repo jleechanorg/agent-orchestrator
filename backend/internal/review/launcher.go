@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aoagents/agent-orchestrator/backend/internal/adapters/reviewer/shell"
 	"github.com/aoagents/agent-orchestrator/backend/internal/domain"
 	"github.com/aoagents/agent-orchestrator/backend/internal/ports"
 	sessionmanager "github.com/aoagents/agent-orchestrator/backend/internal/session_manager"
@@ -25,14 +26,15 @@ type Launcher interface {
 
 // LaunchSpec is the engine's request to (re)launch a reviewer for one pass.
 type LaunchSpec struct {
-	RunID         string
-	WorkerID      domain.SessionID
-	Harness       domain.ReviewerHarness
-	WorkspacePath string
-	PRURL         string
-	TargetSHA     string
-	ReviewQueue   []ports.ReviewTask
-	ReviewIndex   int
+	RunID          string
+	WorkerID       domain.SessionID
+	Harness        domain.ReviewerHarness
+	ReviewerConfig domain.ReviewerConfig
+	WorkspacePath  string
+	PRURL          string
+	TargetSHA      string
+	ReviewQueue    []ports.ReviewTask
+	ReviewIndex    int
 }
 
 // reviewerRuntime is the runtime surface the launcher needs: create a pane,
@@ -88,6 +90,16 @@ func (l *agentLauncher) Spawn(ctx context.Context, spec LaunchSpec) (string, err
 	if !ok {
 		return "", fmt.Errorf("no reviewer adapter for harness %q", spec.Harness)
 	}
+	if spec.Harness == domain.ReviewerShell {
+		r, err := shell.NewWithConfig(shell.ReviewerConfig{
+			Cmd: spec.ReviewerConfig.Cmd,
+			Env: spec.ReviewerConfig.Env,
+		})
+		if err != nil {
+			return "", fmt.Errorf("shell reviewer config error: %w", err)
+		}
+		reviewer = r
+	}
 	handleID := reviewerHandleID(spec.WorkerID)
 	inv := l.invocation(spec)
 	if pl, ok := reviewer.(preLaunchReviewer); ok {
@@ -133,6 +145,16 @@ func (l *agentLauncher) Notify(ctx context.Context, handleID string, spec Launch
 	reviewer, ok := l.reviewers.Reviewer(spec.Harness)
 	if !ok {
 		return fmt.Errorf("no reviewer adapter for harness %q", spec.Harness)
+	}
+	if spec.Harness == domain.ReviewerShell {
+		r, err := shell.NewWithConfig(shell.ReviewerConfig{
+			Cmd: spec.ReviewerConfig.Cmd,
+			Env: spec.ReviewerConfig.Env,
+		})
+		if err != nil {
+			return fmt.Errorf("shell reviewer config error: %w", err)
+		}
+		reviewer = r
 	}
 	msg, err := reviewer.ReviewMessage(ctx, l.invocation(spec))
 	if err != nil {

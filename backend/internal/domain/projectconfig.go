@@ -50,8 +50,15 @@ type ProjectConfig struct {
 // ReviewerConfig names one reviewer agent by harness. The harness is drawn from
 // the reviewer vocabulary (ReviewerHarness), which is distinct from the worker
 // AgentHarness set.
+//
+// Cmd is the argv (with template placeholders {pr_url}, {pr_number}, {repo},
+// {target_sha}, {run_id}, {reviewer_id}, {workspace_path}) the shell reviewer
+// runs. Env is the additional environment passed to the shell process. Both
+// fields are no-ops for typed harnesses (claudecode/codex/opencode).
 type ReviewerConfig struct {
 	Harness ReviewerHarness `json:"harness"`
+	Cmd     []string        `json:"cmd,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 // FallbackReviewerHarness is the reviewer used when a project configures none
@@ -66,6 +73,16 @@ func (c ProjectConfig) ResolveReviewerHarness(_ AgentHarness) ReviewerHarness {
 	}
 	return FallbackReviewerHarness
 }
+
+// ResolveReviewerConfig picks the reviewer config for a worker. A configured
+// reviewer wins; otherwise claude-code with empty cmd/env is returned.
+func (c ProjectConfig) ResolveReviewerConfig(_ AgentHarness) ReviewerConfig {
+	if len(c.Reviewers) > 0 {
+		return c.Reviewers[0]
+	}
+	return ReviewerConfig{Harness: FallbackReviewerHarness}
+}
+
 
 // RoleOverride overrides the harness and/or agent config for a session role.
 type RoleOverride struct {

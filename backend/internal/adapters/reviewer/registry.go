@@ -9,6 +9,7 @@ import (
 	"github.com/aoagents/agent-orchestrator/backend/internal/adapters/reviewer/claudecode"
 	"github.com/aoagents/agent-orchestrator/backend/internal/adapters/reviewer/codex"
 	"github.com/aoagents/agent-orchestrator/backend/internal/adapters/reviewer/opencode"
+	"github.com/aoagents/agent-orchestrator/backend/internal/adapters/reviewer/shell"
 	"github.com/aoagents/agent-orchestrator/backend/internal/domain"
 	"github.com/aoagents/agent-orchestrator/backend/internal/ports"
 )
@@ -21,11 +22,20 @@ type Adapter interface {
 
 // Constructors returns every reviewer adapter the daemon ships. Add a reviewer
 // here (and to domain.AllReviewerHarnesses) to register it.
+//
+// The shell adapter is registered as a sentinel: Constructors() is a no-arg
+// factory, so shell.New() is called without a project-specific config. The
+// returned adapter's ReviewCommand returns an error when invoked with no
+// project Cmd configured, so a misuse (using harness="shell" without a Cmd)
+// fails closed at launch time rather than silently running nothing. The
+// launcher is expected to resolve the actual shell.Reviewer from the project's
+// ReviewerConfig before invoking the reviewer.
 func Constructors() []Adapter {
 	return []Adapter{
 		claudecode.New(),
 		codex.New(),
 		opencode.New(),
+		shell.New(),
 	}
 }
 

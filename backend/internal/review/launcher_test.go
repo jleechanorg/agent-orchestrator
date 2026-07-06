@@ -142,3 +142,49 @@ func TestLauncherSpawnNoAdapter(t *testing.T) {
 		t.Fatalf("err = %v, want no-adapter", err)
 	}
 }
+
+func TestLauncherSpawnShellReviewer(t *testing.T) {
+	rt := &fakeRuntime{}
+	// resolver has shell sentinel registered
+	resolver := fakeReviewerResolver{
+		reviewer: &fakeReviewer{}, // not actually called if resolved as shell
+		ok:       true,
+	}
+	l := NewLauncher(resolver, rt)
+
+	spec := LaunchSpec{
+		RunID:    "run-1",
+		WorkerID: "mer-1",
+		Harness:  domain.ReviewerShell,
+		ReviewerConfig: domain.ReviewerConfig{
+			Harness: domain.ReviewerShell,
+			Cmd:     []string{"my-custom-cli", "--pr", "{pr_number}", "--sha", "{target_sha}"},
+			Env:     map[string]string{"CUSTOM_KEY": "custom_val"},
+		},
+		WorkspacePath: "/ws/mer-1",
+		PRURL:         "https://github.com/o/r/pull/123",
+		TargetSHA:     "sha123",
+	}
+
+	handle, err := l.Spawn(context.Background(), spec)
+	if err != nil {
+		t.Fatalf("Spawn shell reviewer: %v", err)
+	}
+	if handle != "review-mer-1" {
+		t.Fatalf("handle = %q, want review-mer-1", handle)
+	}
+
+	expectedArgv := []string{"my-custom-cli", "--pr", "123", "--sha", "sha123"}
+	if len(rt.createCfg.Argv) != len(expectedArgv) {
+		t.Fatalf("argv len = %d, want %d", len(rt.createCfg.Argv), len(expectedArgv))
+	}
+	for i, arg := range rt.createCfg.Argv {
+		if arg != expectedArgv[i] {
+			t.Errorf("argv[%d] = %q, want %q", i, arg, expectedArgv[i])
+		}
+	}
+	if rt.createCfg.Env["CUSTOM_KEY"] != "custom_val" {
+		t.Errorf("expected CUSTOM_KEY='custom_val', got %q", rt.createCfg.Env["CUSTOM_KEY"])
+	}
+}
+

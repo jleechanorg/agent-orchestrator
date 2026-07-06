@@ -13,6 +13,13 @@ const (
 	ReviewerClaudeCode ReviewerHarness = "claude-code"
 	ReviewerCodex      ReviewerHarness = "codex"
 	ReviewerOpenCode   ReviewerHarness = "opencode"
+	// ReviewerShell is the generic config-driven reviewer adapter. Operators
+	// wire one-off/custom harnesses (skeptic, agy wrapper, custom CLIs) via
+	// ReviewerConfig.Cmd + Env with template substitution — no per-tool Go
+	// adapter code required. Matches prior-art shell primitives in Jenkins sh,
+	// Drone commands, GitHub composite actions, Tekton steps, Argo script. See
+	// internal/adapters/reviewer/shell.
+	ReviewerShell ReviewerHarness = "shell"
 )
 
 // AllReviewerHarnesses is the canonical set used to validate a configured
@@ -21,6 +28,7 @@ var AllReviewerHarnesses = []ReviewerHarness{
 	ReviewerClaudeCode,
 	ReviewerCodex,
 	ReviewerOpenCode,
+	ReviewerShell,
 }
 
 // IsKnown reports whether h is one of the supported reviewer harnesses.
