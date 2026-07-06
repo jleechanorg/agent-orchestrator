@@ -13,6 +13,11 @@ const (
 	ReviewerClaudeCode ReviewerHarness = "claude-code"
 	ReviewerCodex      ReviewerHarness = "codex"
 	ReviewerOpenCode   ReviewerHarness = "opencode"
+	// ReviewerSkeptic is the AO Skeptic worker (TS island) reached via the
+	// `ao-ts` CLI. See internal/adapters/reviewer/skeptic. Per Path D
+	// (project_2026-06-25_path_d_confirmed.md) Skeptic is one of the two TS
+	// islands retained under Go; the rest of the worker vocabulary is Go.
+	ReviewerSkeptic ReviewerHarness = "skeptic"
 )
 
 // AllReviewerHarnesses is the canonical set used to validate a configured
@@ -21,6 +26,7 @@ var AllReviewerHarnesses = []ReviewerHarness{
 	ReviewerClaudeCode,
 	ReviewerCodex,
 	ReviewerOpenCode,
+	ReviewerSkeptic,
 }
 
 // IsKnown reports whether h is one of the supported reviewer harnesses.
