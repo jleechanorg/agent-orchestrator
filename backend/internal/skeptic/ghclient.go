@@ -23,10 +23,12 @@ func ghJSON(ctx context.Context, endpoint string, args ...string) ([]byte, error
 
 // ghJSONPaginate is ghJSON with --paginate --slurp (REST only) — each page
 // becomes one array element in the raw response, which callers flatten.
-// Mirrors ghJsonPaginate in gh-client.ts.
-func ghJSONPaginate(ctx context.Context, endpoint string, args ...string) ([]byte, error) {
-	full := append([]string{"api", "--paginate", "--slurp", endpoint}, args...)
-	return ghRunner(ctx, full...)
+// Mirrors ghJsonPaginate in gh-client.ts. No variadic extra-args parameter
+// (unlike ghJSON) — every call site in this package only ever needs the
+// endpoint, and golangci-lint's unparam check flagged the unused
+// generality.
+func ghJSONPaginate(ctx context.Context, endpoint string) ([]byte, error) {
+	return ghRunner(ctx, "api", "--paginate", "--slurp", endpoint)
 }
 
 // isRateLimitOrGraphQLError reports whether errMsg indicates a GraphQL

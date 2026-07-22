@@ -29,10 +29,12 @@ import (
 // this is a real but narrow-probability risk, not a routine failure mode.
 const maxLLMOutputChars = 60_000
 
-// SkepticVerdictBinding carries the request-id/head-sha markers embedded in
+// VerdictBinding carries the request-id/head-sha markers embedded in
 // a verdict comment so the skeptic-gate CI workflow can match it to the
-// trigger that requested it. Mirrors SkepticVerdictBinding in posting.ts.
-type SkepticVerdictBinding struct {
+// trigger that requested it. Mirrors SkepticVerdictBinding in posting.ts
+// (named without the "Skeptic" prefix here since it already lives in the
+// skeptic package — revive's stutter check flagged skeptic.SkepticVerdictBinding).
+type VerdictBinding struct {
 	RequestID string
 	HeadSHA   string
 }
@@ -54,7 +56,7 @@ func PostVerdict(
 	botAuthor string,
 	triggerSHA string,
 	llmOutput string,
-	binding *SkepticVerdictBinding,
+	binding *VerdictBinding,
 ) (string, error) {
 	// Known, deliberate divergence: TS scans `llmOutput ?? verdict` — nullish
 	// coalescing falls back to verdict only when llmOutput is

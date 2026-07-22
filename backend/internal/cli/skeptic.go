@@ -87,7 +87,9 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(errOut, "Fetching PR #%d state…\n", opts.pr)
+	if _, err := fmt.Fprintf(errOut, "Fetching PR #%d state…\n", opts.pr); err != nil {
+		return err
+	}
 
 	pr, err := skeptic.FetchPRMeta(ctx, owner, repo, opts.pr)
 	if err != nil {
@@ -108,8 +110,12 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 		designDoc = nil
 	}
 
-	fmt.Fprintf(errOut, "Fetched PR #%d: %q\n", opts.pr, pr.Title)
-	fmt.Fprintln(errOut, "Fetching merge gate state (aligned with checkMergeGate)…")
+	if _, err := fmt.Fprintf(errOut, "Fetched PR #%d: %q\n", opts.pr, pr.Title); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(errOut, "Fetching merge gate state (aligned with checkMergeGate)…"); err != nil {
+		return err
+	}
 
 	testFiles, err := skeptic.FetchTestFileContents(ctx, owner, repo, opts.pr, diff, pr.HeadRefOID)
 	if err != nil {
@@ -119,7 +125,9 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch merge gate state: %w", err)
 	}
-	fmt.Fprintln(errOut, "Merge gate state fetched")
+	if _, err := fmt.Fprintln(errOut, "Merge gate state fetched"); err != nil {
+		return err
+	}
 
 	// Early SKIP: if all diff files match exclude patterns, post
 	// VERDICT: SKIPPED immediately without running the LLM evaluation.
@@ -134,8 +142,12 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 	}
 	if len(excludePatterns) > 0 && skeptic.AllFilesExcluded(diff, excludePatterns) {
 		skipVerdict := "VERDICT: SKIPPED — all changed files match exclude-paths (docs-only PR)"
-		fmt.Fprint(out, "\n=== SKIP — excluded files ===\n")
-		fmt.Fprintln(out, skipVerdict)
+		if _, err := fmt.Fprint(out, "\n=== SKIP — excluded files ===\n"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(out, skipVerdict); err != nil {
+			return err
+		}
 		if opts.dryRun {
 			return nil
 		}
@@ -143,18 +155,24 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 		if existing != nil {
 			commentID = existing.CommentID
 		}
-		fmt.Fprintf(errOut, "Posting skip verdict to PR #%d…\n", opts.pr)
+		if _, err := fmt.Fprintf(errOut, "Posting skip verdict to PR #%d…\n", opts.pr); err != nil {
+			return err
+		}
 		_, postErr := skeptic.PostVerdict(ctx, owner, repo, opts.pr, skipVerdict, commentID, botAuthor, triggerSHA, skipVerdict,
-			&skeptic.SkepticVerdictBinding{HeadSHA: triggerSHA, RequestID: opts.requestID})
+			&skeptic.VerdictBinding{HeadSHA: triggerSHA, RequestID: opts.requestID})
 		if postErr != nil {
 			return fmt.Errorf("failed to post verdict: %w", postErr)
 		}
-		fmt.Fprintln(errOut, "Done! Skeptic verdict posted.")
+		if _, err := fmt.Fprintln(errOut, "Done! Skeptic verdict posted."); err != nil {
+			return err
+		}
 		return nil
 	}
 
 	// Build and run evaluation.
-	fmt.Fprintln(errOut, "Running skeptic evaluation…")
+	if _, err := fmt.Fprintln(errOut, "Running skeptic evaluation…"); err != nil {
+		return err
+	}
 	prompt := skeptic.BuildSkepticPrompt(pr, state, diff, reviews, designDoc, testFiles)
 	if opts.prompt != "" {
 		prompt = "CUSTOM EVALUATION INSTRUCTIONS:\n" + opts.prompt + "\n\n---\n\n" + prompt
@@ -163,28 +181,46 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(errOut, "Skeptic evaluation complete")
+	if _, err := fmt.Fprintln(errOut, "Skeptic evaluation complete"); err != nil {
+		return err
+	}
 
 	// Rule 10: deterministic evidence-authenticity override — the LLM might
 	// ignore Rule 10, so this backstops any PASS with inauthentic evidence.
 	finalVerdict := skeptic.ApplyEvidenceOverride(verdict, pr.Body)
 	if finalVerdict != verdict {
-		fmt.Fprintln(errOut, "Override: LLM returned PASS but evidence authenticity check failed — forcing FAIL (Rule 10)")
+		if _, err := fmt.Fprintln(errOut, "Override: LLM returned PASS but evidence authenticity check failed — forcing FAIL (Rule 10)"); err != nil {
+			return err
+		}
 	}
 
 	bound := skeptic.BindVerdictOutput(finalVerdict)
 
 	if opts.dryRun {
-		fmt.Fprint(out, "\n=== DRY RUN — Verdict ===\n")
+		if _, err := fmt.Fprint(out, "\n=== DRY RUN — Verdict ===\n"); err != nil {
+			return err
+		}
 		if bound.VerdictType == "" {
-			fmt.Fprintln(errOut, "Could not parse VERDICT from LLM output.")
-			fmt.Fprint(out, "\n=== Full LLM output ===\n")
-			fmt.Fprintln(out, bound.LLMOutput)
+			if _, err := fmt.Fprintln(errOut, "Could not parse VERDICT from LLM output."); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprint(out, "\n=== Full LLM output ===\n"); err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintln(out, bound.LLMOutput); err != nil {
+				return err
+			}
 			return fmt.Errorf("could not parse VERDICT from LLM output")
 		}
-		fmt.Fprintln(out, bound.VerdictLine)
-		fmt.Fprint(out, "\n=== Full LLM output ===\n")
-		fmt.Fprintln(out, bound.LLMOutput)
+		if _, err := fmt.Fprintln(out, bound.VerdictLine); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprint(out, "\n=== Full LLM output ===\n"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(out, bound.LLMOutput); err != nil {
+			return err
+		}
 		if bound.VerdictType == "FAIL" || bound.VerdictType == "SKIPPED" {
 			return fmt.Errorf("verdict: %s", bound.VerdictType)
 		}
@@ -192,28 +228,38 @@ func runSkepticVerify(cmd *cobra.Command, opts skepticVerifyOptions) error {
 	}
 
 	if bound.VerdictType == "" {
-		fmt.Fprintln(errOut, "Could not parse VERDICT from LLM output. Posting raw output.")
+		if _, err := fmt.Fprintln(errOut, "Could not parse VERDICT from LLM output. Posting raw output."); err != nil {
+			return err
+		}
 	}
 
 	commentID := 0
 	if existing != nil {
 		commentID = existing.CommentID
 	}
-	fmt.Fprintf(errOut, "Posting verdict to PR #%d…\n", opts.pr)
+	if _, err := fmt.Fprintf(errOut, "Posting verdict to PR #%d…\n", opts.pr); err != nil {
+		return err
+	}
 	commentBody, err := skeptic.PostVerdict(ctx, owner, repo, opts.pr, bound.VerdictLine, commentID, botAuthor, triggerSHA, bound.LLMOutput,
-		&skeptic.SkepticVerdictBinding{HeadSHA: triggerSHA, RequestID: opts.requestID})
+		&skeptic.VerdictBinding{HeadSHA: triggerSHA, RequestID: opts.requestID})
 	if err != nil {
 		return fmt.Errorf("failed to post verdict: %w", err)
 	}
-	fmt.Fprintln(errOut, "Done! Skeptic verdict posted.")
+	if _, err := fmt.Fprintln(errOut, "Done! Skeptic verdict posted."); err != nil {
+		return err
+	}
 
 	// Verify both run-level (LLM output) and comment-level (GitHub comment)
 	// evidence — surfaces INSUFFICIENT when evidence is missing or
 	// inconsistent, fail-closed.
 	claimResult := skeptic.VerifySkepticClaim(finalVerdict, commentBody)
-	fmt.Fprintln(out, skeptic.FormatClaimVerification(claimResult))
+	if _, err := fmt.Fprintln(out, skeptic.FormatClaimVerification(claimResult)); err != nil {
+		return err
+	}
 	if claimResult.BlocksWorking {
-		fmt.Fprintf(errOut, "⚠  Claim verification: %s — agent 'working' status is NOT permitted until resolved.\n", claimResult.Outcome)
+		if _, err := fmt.Fprintf(errOut, "⚠  Claim verification: %s — agent 'working' status is NOT permitted until resolved.\n", claimResult.Outcome); err != nil {
+			return err
+		}
 	}
 
 	// Note: unlike the dry-run branch above, a FAIL/SKIPPED verdict here is

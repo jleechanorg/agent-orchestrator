@@ -109,7 +109,7 @@ func hasMatchingWorkflowTrigger(comments []IssueComment, verdictBody, headSHA, r
 		triggerLabelRe := regexp.MustCompile(`(?i)SKEPTIC_` + strings.ToUpper(triggerType) + `_TRIGGER`)
 		triggerMarkerRe := regexp.MustCompile(`(?i)<!--\s*skeptic-` + triggerType + `-trigger-` + escapedSHA + `\s*-->`)
 		for _, c := range comments {
-			if strings.ToLower(c.User.Login) != "github-actions[bot]" {
+			if !strings.EqualFold(c.User.Login, "github-actions[bot]") {
 				continue
 			}
 			if triggerLabelRe.MatchString(c.Body) &&
@@ -293,7 +293,7 @@ func FetchMergeGateState(ctx context.Context, owner, repo string, prNumber int, 
 	var crState string
 	if latestCR != nil {
 		crState = latestCR.State
-		crApproved = strings.ToLower(latestCR.State) == "approved" && !crDismissedWithoutApproval
+		crApproved = strings.EqualFold(latestCR.State, "approved") && !crDismissedWithoutApproval
 	} else {
 		// No on-head decisive review. Surface this explicitly so the LLM
 		// doesn't fall back to GitHub's UI-level reviewDecision (which
@@ -394,7 +394,7 @@ func FetchMergeGateState(ctx context.Context, owner, repo string, prNumber int, 
 		}
 	}
 	sortedEvidence := sortReviewsNewestFirst(evidenceReviews)
-	evidenceApproved := len(sortedEvidence) > 0 && strings.ToLower(sortedEvidence[0].State) == "approved"
+	evidenceApproved := len(sortedEvidence) > 0 && strings.EqualFold(sortedEvidence[0].State, "approved")
 	evidenceRequired := false // controlled via config; default false for skeptic CLI
 
 	// 5. Existing skeptic verdict — use paginated fetch to capture all pages
@@ -555,7 +555,7 @@ func findExistingSkepticVerdict(ctx context.Context, owner, repo string, prNumbe
 		}
 		parsedVerdict := strings.ToUpper(m[1])
 		verdictRequestID := extractSkepticRequestId(c.Body)
-		authorIsPRAuthor := prAuthor != "" && authorLogin == strings.ToLower(prAuthor)
+		authorIsPRAuthor := prAuthor != "" && strings.EqualFold(authorLogin, prAuthor)
 		if authorIsPRAuthor {
 			continue
 		}

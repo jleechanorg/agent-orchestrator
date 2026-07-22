@@ -175,13 +175,13 @@ func BuildSkepticPrompt(pr PRInfo, state MergeGateState, diff string, reviews []
 	// APPROVED review so the LLM isn't blocked by dismissed reviews (Rule 4).
 	hasApprovedReview := false
 	for _, r := range reviews {
-		if IsCodeRabbitReview(r) && strings.ToLower(r.State) == "approved" {
+		if IsCodeRabbitReview(r) && strings.EqualFold(r.State, "approved") {
 			hasApprovedReview = true
 			break
 		}
 	}
-	modifiedReviews := make([]ReviewInfo, len(reviews))
-	copy(modifiedReviews, reviews)
+	modifiedReviews := make([]ReviewInfo, 0, len(reviews)+1)
+	modifiedReviews = append(modifiedReviews, reviews...)
 	if state.CRApproved && !hasApprovedReview {
 		modifiedReviews = append(modifiedReviews, ReviewInfo{
 			Author:      &ReviewAuthor{Login: "coderabbitai"},
@@ -213,8 +213,8 @@ func BuildSkepticPrompt(pr PRInfo, state MergeGateState, diff string, reviews []
 		}
 	}
 	crEmptyBodyApproved := latestCRDecisive != nil &&
-		strings.ToLower(latestCRDecisive.State) == "approved" &&
-		len(latestCRDecisive.Body) == 0
+		strings.EqualFold(latestCRDecisive.State, "approved") &&
+		latestCRDecisive.Body == ""
 
 	unresolvedLabel := "PASS"
 	if state.UnresolvedBlockingComments > 0 {
@@ -279,7 +279,8 @@ func BuildSkepticPrompt(pr PRInfo, state MergeGateState, diff string, reviews []
 		diffTruncatedNote = "\n\n[DIFF TRUNCATED - TOO LARGE]"
 	}
 
-	summaryLines := []string{
+	summaryLines := make([]string, 0, 16+len(reviewLines)+6)
+	summaryLines = append(summaryLines,
 		fmt.Sprintf("PR #%d: %s", pr.Number, pr.Title),
 		fmt.Sprintf("State: %s | Draft: %s", pr.State, strconv.FormatBool(pr.IsDraft)),
 		fmt.Sprintf("Base: %s", pr.BaseRefName),
@@ -296,7 +297,7 @@ func BuildSkepticPrompt(pr PRInfo, state MergeGateState, diff string, reviews []
 		"  8. Description/code/evidence alignment: YOU MUST EVALUATE THIS",
 		"",
 		"--- RECENT REVIEWS (chronological, most recent shown) ---",
-	}
+	)
 	summaryLines = append(summaryLines, reviewLines...)
 	summaryLines = append(summaryLines,
 		"",

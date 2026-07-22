@@ -10,11 +10,12 @@ func parseRFC3339Lenient(s string) (int64, error) {
 	layouts := []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05Z0700"}
 	var lastErr error
 	for _, layout := range layouts {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.UnixMilli(), nil
-		} else {
+		t, err := time.Parse(layout, s)
+		if err != nil {
 			lastErr = err
+			continue
 		}
+		return t.UnixMilli(), nil
 	}
 	return 0, lastErr
 }

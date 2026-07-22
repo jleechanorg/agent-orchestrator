@@ -166,7 +166,7 @@ func TestPostVerdict_IncludesBindingMarkers(t *testing.T) {
 		nil,
 		func(_ context.Context, _, _ string, _ int, b string) (string, error) { body = b; return b, nil },
 	)
-	binding := &SkepticVerdictBinding{RequestID: "req-123", HeadSHA: "abc1234"}
+	binding := &VerdictBinding{RequestID: "req-123", HeadSHA: "abc1234"}
 	_, err := PostVerdict(ctx, "owner", "repo", 42, "VERDICT: PASS", 0, "github-actions[bot]", "abc1234", "", binding)
 	if err != nil {
 		t.Fatal(err)

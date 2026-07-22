@@ -10,6 +10,7 @@ import (
 // layer check. Mirrors EvidenceResult in claim-verifier.ts.
 type EvidenceResult string
 
+// The three possible EvidenceResult values for a single evidence layer.
 const (
 	EvidencePass   EvidenceResult = "pass"
 	EvidenceFail   EvidenceResult = "fail"
@@ -172,19 +173,20 @@ func VerifySkepticClaim(llmOutput, commentBody string) ClaimVerificationResult {
 // output. Mirrors formatClaimVerification in claim-verifier.ts (ASCII box
 // characters and unicode ⚠/✓ glyphs preserved verbatim).
 func FormatClaimVerification(result ClaimVerificationResult) string {
-	var lines []string
-	lines = append(lines, "")
-	lines = append(lines, "┌─ Claim Verification ──────────────────────────────────────────────")
-	lines = append(lines, fmt.Sprintf("│ Run-level:     [%-8s] %s", strings.ToUpper(string(result.RunLevel.Result)), result.RunLevel.Detail))
-	lines = append(lines, fmt.Sprintf("│ Comment-level: [%-8s] %s", strings.ToUpper(string(result.CommentLevel.Result)), result.CommentLevel.Detail))
-	lines = append(lines, "├──────────────────────────────────────────────────────────────────")
 	firstSummaryLine := strings.SplitN(result.Summary, "\n", 2)[0]
-	lines = append(lines, fmt.Sprintf("│ Outcome:       [%-8s] %s", result.Outcome, firstSummaryLine))
+	statusLine := "│ ✓  claim verified — 'working' status permitted"
 	if result.Outcome != "PASS" {
-		lines = append(lines, "│ ⚠  blocks 'working' status report")
-	} else {
-		lines = append(lines, "│ ✓  claim verified — 'working' status permitted")
+		statusLine = "│ ⚠  blocks 'working' status report"
 	}
-	lines = append(lines, "└──────────────────────────────────────────────────────────────────")
+	lines := []string{
+		"",
+		"┌─ Claim Verification ──────────────────────────────────────────────",
+		fmt.Sprintf("│ Run-level:     [%-8s] %s", strings.ToUpper(string(result.RunLevel.Result)), result.RunLevel.Detail),
+		fmt.Sprintf("│ Comment-level: [%-8s] %s", strings.ToUpper(string(result.CommentLevel.Result)), result.CommentLevel.Detail),
+		"├──────────────────────────────────────────────────────────────────",
+		fmt.Sprintf("│ Outcome:       [%-8s] %s", result.Outcome, firstSummaryLine),
+		statusLine,
+		"└──────────────────────────────────────────────────────────────────",
+	}
 	return strings.Join(lines, "\n")
 }

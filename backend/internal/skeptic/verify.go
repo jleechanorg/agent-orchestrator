@@ -138,7 +138,10 @@ func ApplyEvidenceOverride(verdict, prBody string) string {
 		return verdict
 	}
 	m := VerdictLineRegex.FindStringSubmatch(verdict)
-	if m == nil || strings.ToUpper(m[1]) != "PASS" {
+	if m == nil {
+		return verdict
+	}
+	if !strings.EqualFold(m[1], "PASS") {
 		return verdict
 	}
 	overridden := replaceFirstMatch(verdict, VerdictLineRegex,
@@ -167,7 +170,7 @@ func replaceFirstMatch(s string, re *regexp.Regexp, replacement string) string {
 // string-or-string-array overload — the real CLI --model flag only ever
 // supplies a single value, so that generality is not ported (ponytail:
 // single-string ceiling; extend to []string if a caller needs it).
-func RunEvaluation(ctx context.Context, runners llmeval.Runners, prompt string, model string) (string, error) {
+func RunEvaluation(ctx context.Context, runners llmeval.Runners, prompt, model string) (string, error) {
 	chain := llmeval.DefaultChain
 	if model != "" {
 		valid := false
