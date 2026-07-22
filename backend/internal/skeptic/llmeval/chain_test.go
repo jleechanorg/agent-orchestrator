@@ -158,3 +158,20 @@ func TestRotateToStart_UnknownModel(t *testing.T) {
 		t.Fatal("expected ok=false for an unknown model")
 	}
 }
+
+// TestDefaultRunners_HasAllChainModels guards against a model being added
+// to DefaultChain without a matching production Runner ever being wired in
+// — Eval silently skips unknown models (`continue` on !known), so a gap
+// here would fail-closed with a wrong "not available" message instead of a
+// crash, which is easy to miss without an explicit test.
+func TestDefaultRunners_HasAllChainModels(t *testing.T) {
+	runners := DefaultRunners()
+	for _, m := range DefaultChain {
+		if _, ok := runners[m]; !ok {
+			t.Fatalf("DefaultRunners() is missing a Runner for chain model %q", m)
+		}
+	}
+	if len(runners) != len(DefaultChain) {
+		t.Fatalf("DefaultRunners() has %d entries, want exactly %d (one per DefaultChain model, no extras)", len(runners), len(DefaultChain))
+	}
+}

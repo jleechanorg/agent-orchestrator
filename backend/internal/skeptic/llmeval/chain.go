@@ -36,6 +36,18 @@ type Runner func(ctx context.Context, prompt string) Result
 // exec-mocking framework.
 type Runners map[Model]Runner
 
+// DefaultRunners returns the production Runners map, wired to the real
+// per-model adapters (TryCodex, TryClaude, TryGemini, TryMinimax, TryAgy).
+func DefaultRunners() Runners {
+	return Runners{
+		ModelCodex:   TryCodex,
+		ModelClaude:  TryClaude,
+		ModelGemini:  TryGemini,
+		ModelMinimax: TryMinimax,
+		ModelAgy:     TryAgy,
+	}
+}
+
 // dedupThreshold: if this many consecutive models produce the same outcome
 // signature, Eval stops early rather than trying the rest of the chain —
 // strong evidence of a systemic issue (broken prompt template, expired
