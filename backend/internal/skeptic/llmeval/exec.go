@@ -3,6 +3,7 @@ package llmeval
 import (
 	"bytes"
 	"context"
+	"os"
 	"strings"
 
 	"github.com/aoagents/agent-orchestrator/backend/internal/process"
@@ -20,8 +21,29 @@ import (
 // internal/adapters/agent/authprobe/authprobe.go's CmdRunner) — tests swap
 // it out rather than requiring a real CLI binary on PATH.
 var cmdRunner = func(ctx context.Context, binary string, args []string, stdin string) (stdout string, err error) {
+	return runWithEnv(ctx, binary, args, stdin, nil)
+}
+
+// cmdRunnerEnv is cmdRunner plus environment variable overrides layered on
+// top of the current process environment — used by adapters (minimax) that
+// invoke a shared CLI binary against an alternate provider endpoint/API key
+// rather than the binary's default credentials. A separate package var
+// (rather than changing cmdRunner's signature) keeps the simpler adapters'
+// existing fakes untouched.
+var cmdRunnerEnv = func(ctx context.Context, binary string, args []string, stdin string, envOverrides map[string]string) (stdout string, err error) {
+	return runWithEnv(ctx, binary, args, stdin, envOverrides)
+}
+
+func runWithEnv(ctx context.Context, binary string, args []string, stdin string, envOverrides map[string]string) (stdout string, err error) {
 	cmd := process.CommandContext(ctx, binary, args...)
 	cmd.Stdin = strings.NewReader(stdin)
+	if envOverrides != nil {
+		env := os.Environ()
+		for k, v := range envOverrides {
+			env = append(env, k+"="+v)
+		}
+		cmd.Env = env
+	}
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
