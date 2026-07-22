@@ -428,7 +428,19 @@ func extractAllDiffFilePaths(diff string) []string {
 }
 
 // FetchIssueComments fetches every PR/issue comment, paginating through all
-// pages. Mirrors fetchIssueComments in gh-client.ts.
+// pages. Mirrors fetchIssueComments in gh-client.ts, with one deliberate,
+// disclosed improvement: TS's version does an unchecked `as
+// Array<IssueComment[]>` cast straight onto the raw REST JSON with no field
+// remapping, so its camelCase `createdAt` never actually gets populated at
+// runtime (GitHub's real REST API returns snake_case `created_at` — this is
+// a latent bug in the TS source, invisible to tsc since `as` casts aren't
+// checked). This Go port explicitly decodes the snake_case field and
+// copies it into IssueComment.CreatedAt, so CreatedAt IS correctly
+// populated here — a real, intentional divergence from what the TS code
+// actually does at runtime, found by adversarial review. Not reverted to
+// match the TS bug: no known caller in this pipeline currently reads
+// CreatedAt, and there is no reason to faithfully reproduce a bug instead
+// of just being correct.
 func FetchIssueComments(ctx context.Context, owner, repo string, prNumber int) ([]IssueComment, error) {
 	raw, err := ghJSONPaginate(ctx, fmt.Sprintf("repos/%s/%s/issues/%d/comments", owner, repo, prNumber))
 	if err != nil {
