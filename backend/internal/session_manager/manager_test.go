@@ -1391,6 +1391,39 @@ func TestCleanup_ReclaimsSessionsWithNoWorkspace(t *testing.T) {
 	}
 }
 
+// TestCleanup_NoWorkspacePathButLeftoverWorktreeRowsIsNotFalselyCleaned covers
+// an adversarial-review finding on TestCleanup_ReclaimsSessionsWithNoWorkspace:
+// destroySpawnWorkspace's DeleteSessionWorktrees call during spawn rollback is
+// best-effort (error swallowed, see manager.go's destroySpawnWorkspace), so a
+// terminated row with an empty WorkspacePath can still have real leftover
+// workspace-project worktree rows in the store. Treating "no workspace path"
+// alone as "trivially clean" would report a false "Cleaned" for a session
+// whose child worktrees were never actually torn down. Cleanup must still
+// destroy (or report Skipped for) any leftover rows even when the session's
+// own WorkspacePath metadata is empty.
+func TestCleanup_NoWorkspacePathButLeftoverWorktreeRowsIsNotFalselyCleaned(t *testing.T) {
+	m, st, _, ws := newManager()
+	st.projects["mer"] = domain.ProjectRecord{ID: "mer", Path: "/repo/mer", Kind: domain.ProjectKindWorkspace, Config: testRoleAgents()}
+	st.workspaceRepo["mer"] = []domain.WorkspaceRepoRecord{{Name: "api", RelativePath: "api"}}
+	seedTerminal(st, "mer-1", domain.SessionMetadata{}) // WorkspacePath deliberately empty
+	st.worktrees["mer-1"] = []domain.SessionWorktreeRecord{
+		{SessionID: "mer-1", RepoName: domain.RootWorkspaceRepoName, Branch: "ao/mer-1", WorktreePath: "/ws/mer-1"},
+		{SessionID: "mer-1", RepoName: "api", Branch: "ao/mer-1", WorktreePath: "/ws/mer-1/api"},
+	}
+
+	res, err := m.Cleanup(ctx, "mer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Cleaned) != 1 || res.Cleaned[0] != "mer-1" {
+		t.Fatalf("cleaned = %v, want [mer-1] (rows should be torn down, then counted clean)", res.Cleaned)
+	}
+	want := []string{"Destroy:api", "Destroy:__root__"}
+	if got := ws.calls; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("destroy order = %v, want %v — leftover worktree rows must actually be torn down, not silently claimed clean", got, want)
+	}
+}
+
 // TestCleanup_ReportsSkippedWorkspaces: a refused teardown must be visible in
 // the result with a reason — a silent skip leaves users staring at
 // "Would clean N … 0 sessions cleaned" with no explanation.
