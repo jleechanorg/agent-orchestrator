@@ -21,8 +21,9 @@ import (
 // that single resolved path rather than re-implementing a second,
 // independently-drifting candidate list. The executability/EACCES
 // candidate-skip nuance from the TS version is not reproduced (tracked as
-// a follow-up in STATE.md) — a not-executable resolved binary surfaces as
-// a normal exec error instead of silently trying a sibling candidate.
+// a follow-up in bead jleechan-xpz7) — a not-executable resolved binary
+// surfaces as a normal exec error instead of silently trying a sibling
+// candidate.
 var resolveClaudeBinary = claudecode.ResolveClaudeBinary
 
 func isRateLimited(msg string) bool {

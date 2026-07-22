@@ -88,7 +88,13 @@ func TryAgy(ctx context.Context, prompt string) Result {
 		permissionFlag = "--yolo"
 	}
 
-	out, runErr := cmdRunner(ctx, binary, []string{permissionFlag, "-p", ""}, prompt)
+	// Run from /tmp — the one path ensureAgyTrustedFolders always marks
+	// trusted, mirroring llm-eval-agy.ts's `cwd: "/tmp"` on its
+	// execFileSync call. agy's non-interactive workspace-trust check keys
+	// off cwd, so writing the trust file alone (without also running FROM
+	// a trusted directory) leaves agy refusing to run whenever the
+	// daemon's own ambient working directory isn't itself trusted.
+	out, runErr := cmdRunnerDir(ctx, binary, []string{permissionFlag, "-p", ""}, prompt, "/tmp")
 	if runErr != nil {
 		if IsUnavailable(runErr.Error()) {
 			return Result{}

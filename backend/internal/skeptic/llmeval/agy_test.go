@@ -9,10 +9,10 @@ import (
 	"testing"
 )
 
-func withFakeAgy(t *testing.T, binaryPath string, binaryErr error, run func(ctx context.Context, binary string, args []string, stdin string) (string, error)) {
+func withFakeAgy(t *testing.T, binaryPath string, binaryErr error, run func(ctx context.Context, binary string, args []string, stdin string, dir string) (string, error)) {
 	t.Helper()
 	origResolve := resolveAgyBinary
-	origRunner := cmdRunner
+	origRunner := cmdRunnerDir
 	origTrust := ensureAgyTrustedFolders
 	resolveAgyBinary = func(context.Context) (string, error) {
 		if binaryErr != nil {
@@ -20,11 +20,11 @@ func withFakeAgy(t *testing.T, binaryPath string, binaryErr error, run func(ctx 
 		}
 		return binaryPath, nil
 	}
-	cmdRunner = run
+	cmdRunnerDir = run
 	ensureAgyTrustedFolders = func() {} // skip the real filesystem side effect in these tests
 	t.Cleanup(func() {
 		resolveAgyBinary = origResolve
-		cmdRunner = origRunner
+		cmdRunnerDir = origRunner
 		ensureAgyTrustedFolders = origTrust
 	})
 }
@@ -39,7 +39,7 @@ func TestTryAgy_BinaryUnresolved(t *testing.T) {
 
 func TestTryAgy_DangerouslySkipPermissionsForNonGeminiBinary(t *testing.T) {
 	var gotArgs []string
-	withFakeAgy(t, "/fake/bin/agy", nil, func(_ context.Context, _ string, args []string, _ string) (string, error) {
+	withFakeAgy(t, "/fake/bin/agy", nil, func(_ context.Context, _ string, args []string, _ string, _ string) (string, error) {
 		gotArgs = args
 		return "VERDICT: PASS", nil
 	})
@@ -58,7 +58,7 @@ func TestTryAgy_DangerouslySkipPermissionsForNonGeminiBinary(t *testing.T) {
 // --dangerously-skip-permissions.
 func TestTryAgy_YoloFlagForGeminiNamedBinary(t *testing.T) {
 	var gotArgs []string
-	withFakeAgy(t, "/fake/bin/gemini", nil, func(_ context.Context, _ string, args []string, _ string) (string, error) {
+	withFakeAgy(t, "/fake/bin/gemini", nil, func(_ context.Context, _ string, args []string, _ string, _ string) (string, error) {
 		gotArgs = args
 		return "VERDICT: PASS", nil
 	})
@@ -68,8 +68,26 @@ func TestTryAgy_YoloFlagForGeminiNamedBinary(t *testing.T) {
 	}
 }
 
+// TestTryAgy_RunsFromTmp covers a real gap found in adversarial review:
+// ensureAgyTrustedFolders marks /tmp (among others) as trusted, but agy's
+// workspace-trust check keys off the subprocess's ACTUAL cwd — writing the
+// trust file is a no-op protection unless the process also runs from a
+// trusted directory. Mirrors llm-eval-agy.ts's explicit `cwd: "/tmp"` on
+// its execFileSync call.
+func TestTryAgy_RunsFromTmp(t *testing.T) {
+	var gotDir string
+	withFakeAgy(t, "/fake/bin/agy", nil, func(_ context.Context, _ string, _ []string, _ string, dir string) (string, error) {
+		gotDir = dir
+		return "VERDICT: PASS", nil
+	})
+	TryAgy(ctx, "prompt")
+	if gotDir != "/tmp" {
+		t.Fatalf("dir = %q, want /tmp (the path ensureAgyTrustedFolders always marks trusted)", gotDir)
+	}
+}
+
 func TestTryAgy_UnavailableError(t *testing.T) {
-	withFakeAgy(t, "/fake/bin/agy", nil, func(context.Context, string, []string, string) (string, error) {
+	withFakeAgy(t, "/fake/bin/agy", nil, func(context.Context, string, []string, string, string) (string, error) {
 		return "", errors.New("exec: \"agy\": executable file not found in $PATH")
 	})
 	got := TryAgy(ctx, "prompt")
@@ -79,7 +97,7 @@ func TestTryAgy_UnavailableError(t *testing.T) {
 }
 
 func TestTryAgy_SuccessButMissingVerdict(t *testing.T) {
-	withFakeAgy(t, "/fake/bin/agy", nil, func(context.Context, string, []string, string) (string, error) {
+	withFakeAgy(t, "/fake/bin/agy", nil, func(context.Context, string, []string, string, string) (string, error) {
 		return "looks fine", nil
 	})
 	got := TryAgy(ctx, "prompt")

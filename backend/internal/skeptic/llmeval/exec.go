@@ -21,7 +21,7 @@ import (
 // internal/adapters/agent/authprobe/authprobe.go's CmdRunner) — tests swap
 // it out rather than requiring a real CLI binary on PATH.
 var cmdRunner = func(ctx context.Context, binary string, args []string, stdin string) (stdout string, err error) {
-	return runWithEnv(ctx, binary, args, stdin, nil)
+	return run(ctx, binary, args, stdin, nil, "")
 }
 
 // cmdRunnerEnv is cmdRunner plus environment variable overrides layered on
@@ -31,10 +31,19 @@ var cmdRunner = func(ctx context.Context, binary string, args []string, stdin st
 // (rather than changing cmdRunner's signature) keeps the simpler adapters'
 // existing fakes untouched.
 var cmdRunnerEnv = func(ctx context.Context, binary string, args []string, stdin string, envOverrides map[string]string) (stdout string, err error) {
-	return runWithEnv(ctx, binary, args, stdin, envOverrides)
+	return run(ctx, binary, args, stdin, envOverrides, "")
 }
 
-func runWithEnv(ctx context.Context, binary string, args []string, stdin string, envOverrides map[string]string) (stdout string, err error) {
+// cmdRunnerDir is cmdRunner plus an explicit working directory for the
+// subprocess — used by adapters (agy) whose CLI keys workspace-trust
+// decisions off cwd, so the process must actually run from a directory
+// that was just marked trusted rather than inheriting the daemon's
+// ambient working directory.
+var cmdRunnerDir = func(ctx context.Context, binary string, args []string, stdin string, dir string) (stdout string, err error) {
+	return run(ctx, binary, args, stdin, nil, dir)
+}
+
+func run(ctx context.Context, binary string, args []string, stdin string, envOverrides map[string]string, dir string) (stdout string, err error) {
 	cmd := process.CommandContext(ctx, binary, args...)
 	cmd.Stdin = strings.NewReader(stdin)
 	if envOverrides != nil {
@@ -43,6 +52,9 @@ func runWithEnv(ctx context.Context, binary string, args []string, stdin string,
 			env = append(env, k+"="+v)
 		}
 		cmd.Env = env
+	}
+	if dir != "" {
+		cmd.Dir = dir
 	}
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf

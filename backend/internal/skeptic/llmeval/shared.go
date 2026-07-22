@@ -89,7 +89,7 @@ func IsUnavailable(errMsg string) bool {
 // them together rather than returning a misleading per-binary infra error).
 // Mirrors isAuthError in llm-eval-shared.ts. Not yet consumed by Eval —
 // reserved for a follow-up faithful port of the TS chain's auth-aware
-// skip-ahead behavior (tracked in STATE.md); exposed now so verdict/error
+// skip-ahead behavior (tracked in bead jleechan-xpz7); exposed now so verdict/error
 // classification tests can exercise it independently.
 func IsAuthError(msg string) bool {
 	lower := strings.ToLower(msg)
