@@ -44,6 +44,16 @@ type ReviewInfo struct {
 	CommitID string
 }
 
+// IssueComment is one PR/issue comment. Mirrors IssueComment in
+// gh-client.ts.
+type IssueComment struct {
+	ID          int
+	Body        string
+	User        ReviewAuthor
+	CreatedAt   string
+	IsMinimized bool
+}
+
 // IsCodeRabbitReview reports whether r was authored by the CodeRabbit bot.
 // Mirrors isCodeRabbitReview in gh-client.ts. GraphQL's author.login
 // returns "coderabbitai" (no [bot] suffix); some paths report
