@@ -40,7 +40,7 @@ func TryCodex(ctx context.Context, prompt string) Result {
 			if IsUnavailable(runErr.Error()) {
 				return Result{}
 			}
-			return Result{Err: firstLine(runErr.Error(), 300)}
+			return Result{Err: firstLine(runErr.Error())}
 		}
 	}
 

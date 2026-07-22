@@ -59,7 +59,7 @@ func TryClaude(ctx context.Context, prompt string) Result {
 	out, runErr := cmdRunner(ctx, binary, args, prompt)
 	if runErr != nil && isRateLimited(runErr.Error()) {
 		if sleepErr := claudeSleep(ctx, 2*time.Second); sleepErr != nil {
-			return Result{Err: firstLine(sleepErr.Error(), 300)}
+			return Result{Err: firstLine(sleepErr.Error())}
 		}
 		out, runErr = cmdRunner(ctx, binary, args, prompt)
 	}
@@ -67,7 +67,7 @@ func TryClaude(ctx context.Context, prompt string) Result {
 		if IsUnavailable(runErr.Error()) {
 			return Result{}
 		}
-		return Result{Err: firstLine(runErr.Error(), 300)}
+		return Result{Err: firstLine(runErr.Error())}
 	}
 
 	if !StrictVerdictRegex.MatchString(out) {

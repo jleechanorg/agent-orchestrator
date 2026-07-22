@@ -31,7 +31,7 @@ var ensureAgyTrustedFolders = func() {
 		return
 	}
 	trustedFoldersPath := filepath.Join(home, ".gemini", "trustedFolders.json")
-	if err := os.MkdirAll(filepath.Dir(trustedFoldersPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(trustedFoldersPath), 0o750); err != nil {
 		return
 	}
 
@@ -66,7 +66,7 @@ var ensureAgyTrustedFolders = func() {
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(trustedFoldersPath, encoded, 0o644)
+	_ = os.WriteFile(trustedFoldersPath, encoded, 0o600)
 }
 
 // TryAgy runs agy (Google Antigravity/Gemini CLI) for headless evaluation,
@@ -99,7 +99,7 @@ func TryAgy(ctx context.Context, prompt string) Result {
 		if IsUnavailable(runErr.Error()) {
 			return Result{}
 		}
-		return Result{Err: firstLine(runErr.Error(), 300)}
+		return Result{Err: firstLine(runErr.Error())}
 	}
 
 	if !StrictVerdictRegex.MatchString(out) {

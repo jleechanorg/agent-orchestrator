@@ -85,10 +85,15 @@ func truncate(s string, n int) string {
 	return string(r[:n])
 }
 
-// firstLine returns the first line of s, capped at n runes.
-func firstLine(s string, n int) string {
+// firstLineMaxRunes caps firstLine's output — every call site passes 300,
+// so this is a constant rather than a parameter (golangci-lint's unparam
+// check flagged the always-300 arg).
+const firstLineMaxRunes = 300
+
+// firstLine returns the first line of s, capped at firstLineMaxRunes runes.
+func firstLine(s string) string {
 	if idx := strings.IndexByte(s, '\n'); idx != -1 {
 		s = s[:idx]
 	}
-	return truncate(s, n)
+	return truncate(s, firstLineMaxRunes)
 }
