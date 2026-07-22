@@ -1635,9 +1635,19 @@ func (m *Manager) Cleanup(ctx context.Context, project domain.ProjectID) (Cleanu
 			continue
 		}
 		ws := workspaceInfo(rec)
-		if ws.Path == "" {
-			continue
-		}
+		// A terminated session can have no recorded workspace path at all — e.g.
+		// a spawn parked terminated by markSpawnFailedTerminated/
+		// rollbackSpawnSeedRow's fallback before workspace metadata was ever
+		// persisted (see TestSpawn_ParksRowTerminatedWhenSeedDeleteFails).
+		// previewCleanupSessions lists every terminated session as a cleanup
+		// candidate regardless of workspace path, so silently dropping these
+		// below (the pre-fix behavior) made `ao session cleanup` show "Would
+		// clean <id>" and then report 0 cleaned with no explanation
+		// (orch-v7jq). Runtime handles and workspace-project worktree rows are
+		// still checked below even when ws.Path == "" — destroySpawnWorkspace's
+		// best-effort DeleteSessionWorktrees can itself fail, leaving real
+		// leftover rows behind a seed-shaped record — so this never claims
+		// "Cleaned" while real resources remain untorn-down.
 		if h := runtimeHandle(rec.Metadata); h.ID != "" {
 			_ = m.runtime.Destroy(ctx, h) // best effort; usually already gone
 		}
@@ -1653,14 +1663,16 @@ func (m *Manager) Cleanup(ctx context.Context, project domain.ProjectID) (Cleanu
 				result.Skipped = append(result.Skipped, CleanupSkip{SessionID: rec.ID, Reason: cleanupSkipReason(err)})
 				continue
 			}
-		} else if err := m.workspace.Destroy(ctx, ws); err != nil {
-			if !errors.Is(err, ports.ErrWorkspaceDirty) {
-				// The public reason stays a fixed string (the raw error carries
-				// internal filesystem paths); the full cause lands here.
-				m.logger.Warn("cleanup: workspace teardown failed", "sessionID", rec.ID, "path", ws.Path, "error", err)
+		} else if ws.Path != "" {
+			if err := m.workspace.Destroy(ctx, ws); err != nil {
+				if !errors.Is(err, ports.ErrWorkspaceDirty) {
+					// The public reason stays a fixed string (the raw error carries
+					// internal filesystem paths); the full cause lands here.
+					m.logger.Warn("cleanup: workspace teardown failed", "sessionID", rec.ID, "path", ws.Path, "error", err)
+				}
+				result.Skipped = append(result.Skipped, CleanupSkip{SessionID: rec.ID, Reason: cleanupSkipReason(err)})
+				continue
 			}
-			result.Skipped = append(result.Skipped, CleanupSkip{SessionID: rec.ID, Reason: cleanupSkipReason(err)})
-			continue
 		}
 		result.Cleaned = append(result.Cleaned, rec.ID)
 	}
