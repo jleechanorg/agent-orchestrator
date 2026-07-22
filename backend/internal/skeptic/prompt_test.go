@@ -30,6 +30,21 @@ func TestIsEvidenceAuthentic(t *testing.T) {
 		{"coverage in prose with em dash still fails without percent", "## Evidence\nCoverage improved -- all tests pass", false},
 		{"fabricated pattern outside evidence section is ignored", "## Background\nTODO fix this\n## Evidence\nreal output here, all good", true},
 		{"case-insensitive TODO/TBD/simulated", "## Evidence\ntodo tbd SIMULATED", false},
+		// Regression: an earlier version of the Go port discarded
+		// same-line trailing text after "## Evidence" (e.g. "## Evidence:
+		// some content" on one line, nothing after it) because it
+		// unconditionally cut through the first newline after the heading
+		// match — with no following newline at all, that cut discarded
+		// the ENTIRE evidence content, producing a false "empty section"
+		// FAIL. TS's split (body.split(/^##\s*Evidence/im)[1]) only splits
+		// on the regex match itself and keeps everything after it,
+		// including same-line text with no trailing newline. Found by
+		// adversarial review; this exact input (single line, no trailing
+		// newline) is the one that actually distinguishes the two
+		// behaviors — an earlier regression test using multi-line inputs
+		// happened not to, since the buggy and fixed code paths landed on
+		// the same verdict for that specific content.
+		{"heading with same-line trailing text and no following newline is not treated as empty", "## Evidence: real output here, all good", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

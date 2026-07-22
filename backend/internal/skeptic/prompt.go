@@ -54,15 +54,16 @@ func IsEvidenceAuthentic(body string) bool {
 	if loc == nil {
 		return false
 	}
+	// Everything after the heading match, INCLUDING same-line trailing text
+	// (e.g. "## Evidence: see below" keeps "see below") — matches TS's
+	// `body.split(/^##\s*Evidence/im)[1]`, which splits on the regex match
+	// itself and does not additionally discard the rest of that line. An
+	// earlier version of this port incorrectly cut through the first
+	// newline unconditionally, silently discarding same-line content and
+	// causing a real divergence from TS on inputs like
+	// "## Evidence: some content\n## Testing" (found by adversarial
+	// review).
 	afterHeading := body[loc[1]:]
-	// Cut the heading's own line off (everything up to and including the
-	// first newline), matching TS's split on the heading regex which
-	// discards the matched heading text itself.
-	if idx := strings.IndexByte(afterHeading, '\n'); idx != -1 {
-		afterHeading = afterHeading[idx+1:]
-	} else {
-		afterHeading = ""
-	}
 	evidenceContent := afterHeading
 	if next := nextHeadingRe.FindStringIndex(afterHeading); next != nil {
 		evidenceContent = afterHeading[:next[0]]
