@@ -26,7 +26,7 @@ var geminiHTTPPost = func(ctx context.Context, url string, body []byte) (status 
 	if err != nil {
 		return 0, nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return resp.StatusCode, nil, err
@@ -85,7 +85,7 @@ func TryGemini(ctx context.Context, prompt string) Result {
 		if ctx.Err() != nil {
 			return Result{} // timed out / canceled — treat as unavailable, try next
 		}
-		return Result{Err: fmt.Sprintf("Gemini API call failed: %s", firstLine(err.Error(), 300))}
+		return Result{Err: fmt.Sprintf("Gemini API call failed: %s", firstLine(err.Error()))}
 	}
 
 	if status < 200 || status >= 300 {
