@@ -1365,6 +1365,32 @@ func TestCleanup_ReclaimsTerminalWorkspaces(t *testing.T) {
 	}
 }
 
+// TestCleanup_ReclaimsSessionsWithNoWorkspace covers orch-v7jq's cleanup gap:
+// a spawn that failed before workspace metadata was ever persisted (e.g. the
+// TestSpawn_ParksRowTerminatedWhenSeedDeleteFails fallback) parks a
+// terminated row with an empty workspace path. `ao session cleanup` lists it
+// as a candidate ("Would clean <id>") because previewCleanupSessions shows
+// every terminated session, but Cleanup must not silently drop it from both
+// Cleaned and Skipped — that produced the reported "0 sessions cleaned" with
+// no explanation. There is nothing to tear down, so it counts as reclaimed.
+func TestCleanup_ReclaimsSessionsWithNoWorkspace(t *testing.T) {
+	m, st, _, ws := newManager()
+	seedTerminal(st, "mer-1", domain.SessionMetadata{})
+	res, err := m.Cleanup(ctx, "mer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Cleaned) != 1 || res.Cleaned[0] != "mer-1" {
+		t.Fatalf("cleaned = %v, want [mer-1]", res.Cleaned)
+	}
+	if len(res.Skipped) != 0 {
+		t.Fatalf("skipped = %v, want none", res.Skipped)
+	}
+	if ws.destroyed != 0 {
+		t.Fatal("no workspace was ever created; nothing should be destroyed")
+	}
+}
+
 // TestCleanup_ReportsSkippedWorkspaces: a refused teardown must be visible in
 // the result with a reason — a silent skip leaves users staring at
 // "Would clean N … 0 sessions cleaned" with no explanation.

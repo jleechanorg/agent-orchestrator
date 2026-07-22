@@ -1636,6 +1636,16 @@ func (m *Manager) Cleanup(ctx context.Context, project domain.ProjectID) (Cleanu
 		}
 		ws := workspaceInfo(rec)
 		if ws.Path == "" {
+			// A terminated session can have no recorded workspace at all — e.g. a
+			// spawn parked terminated by markSpawnFailedTerminated/
+			// rollbackSpawnSeedRow's fallback before workspace metadata was ever
+			// persisted (see TestSpawn_ParksRowTerminatedWhenSeedDeleteFails).
+			// previewCleanupSessions lists every terminated session as a cleanup
+			// candidate regardless of workspace path, so silently dropping these
+			// here made `ao session cleanup` show "Would clean <id>" and then
+			// report 0 cleaned with no explanation (orch-v7jq). There is nothing
+			// to tear down, so it is trivially already-clean.
+			result.Cleaned = append(result.Cleaned, rec.ID)
 			continue
 		}
 		if h := runtimeHandle(rec.Metadata); h.ID != "" {
