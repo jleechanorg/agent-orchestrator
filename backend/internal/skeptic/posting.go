@@ -13,6 +13,20 @@ import (
 // header/footer so llmOutput can safely occupy the bulk without risking a
 // 422 on createComment/patchComment. Mirrors MAX_LLM_OUTPUT_CHARS in
 // posting.ts.
+//
+// DISCLOSED RISK, shared with the TS source (not a Go-port regression —
+// found by adversarial review, confirmed present in both languages): this
+// cap is a character-count truncation (Go: rune count; TS: UTF-16 code
+// unit count via .slice), not a byte-count truncation. GitHub's real
+// 65536 limit is byte-based. For heavily non-ASCII llmOutput (e.g. a wall
+// of 3-byte CJK characters), 60,000 runes/units can still exceed 65536
+// *bytes* by roughly 2-3x, risking a 422 that neither port currently
+// handles specially — it just propagates as an ordinary CreateComment/
+// PatchComment error. Not fixed here (would be a real improvement over
+// TS, not just a faithful port, and is out of scope for this pass);
+// tracked as a follow-up in bead jleechan-xpz7. LLM verdict output in
+// practice is overwhelmingly ASCII/Latin prose plus code snippets, so
+// this is a real but narrow-probability risk, not a routine failure mode.
 const maxLLMOutputChars = 60_000
 
 // SkepticVerdictBinding carries the request-id/head-sha markers embedded in
