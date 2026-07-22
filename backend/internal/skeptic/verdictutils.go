@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/aoagents/agent-orchestrator/backend/internal/skeptic/llmeval"
 )
 
 // skepticGateMarkerRe matches a single `<!-- skeptic-gate-N:PASS|FAIL|SKIPPED -->`
@@ -27,41 +29,19 @@ func EscapeRegexLiteral(s string) string {
 	return regexp.QuoteMeta(s)
 }
 
-// buildVerdictLineRe builds a case-insensitive, multiline regex matching a
-// VERDICT line for the given accepted verdict words, tolerating
-// blockquote/markdown-bold/ATX-header wrapping. Mirrors buildVerdictLineRe
-// in verdict-utils.ts.
-//
-// NOTE: this duplicates internal/skeptic/llmeval.LineRegex's pattern
-// exactly (same TS source function, same regex). Not imported from
-// llmeval — PR #23 (this branch, skeptic-eval-go-port-prompt) is
-// deliberately independent of PR #22 (skeptic-eval-go-port-llmeval, a
-// separate, not-yet-merged branch that this branch was cut from main
-// before, not after); importing llmeval here would make this branch fail
-// to build until #22 merges first, which defeats the point of keeping the
-// two PRs independently reviewable/mergeable. If/when both land on main,
-// this and llmeval.LineRegex should be consolidated into one shared
-// definition (tracked as a follow-up in bead jleechan-xpz7) rather than
-// left as two copies that could drift.
-func buildVerdictLineRe(verdicts []string) *regexp.Regexp {
-	escaped := make([]string, len(verdicts))
-	for i, v := range verdicts {
-		escaped[i] = regexp.QuoteMeta(v)
-	}
-	pattern := `(?im)^[ \t]*(?:> ?)?(?:#{1,6}[ \t]*)?(?:\*{1,2})?VERDICT:[ \t]*(` +
-		strings.Join(escaped, "|") +
-		`)(?:\*{1,2})?[ \t]*(?:[-—:].*)?$`
-	return regexp.MustCompile(pattern)
-}
-
-// VerdictLineRegex matches a VERDICT: PASS|FAIL|SKIPPED line. Mirrors
-// VERDICT_LINE_RE (= buildVerdictLineRe(["PASS","FAIL","SKIPPED"])) in
-// verdict-utils.ts. Distinct from llmeval.StrictVerdictRegex (PASS|FAIL
-// only, used to validate raw headless-tool output before accepting it into
-// the fallback chain) — this one accepts SKIPPED too, since it's used to
-// parse LLM output / GitHub comment bodies where SKIPPED is a legitimate
-// terminal verdict, not an infra-failure sentinel.
-var VerdictLineRegex = buildVerdictLineRe([]string{"PASS", "FAIL", "SKIPPED"})
+// VerdictLineRegex matches a VERDICT: PASS|FAIL|SKIPPED line, tolerating
+// blockquote/markdown-bold/ATX-header wrapping. Mirrors VERDICT_LINE_RE
+// (= buildVerdictLineRe(["PASS","FAIL","SKIPPED"])) in verdict-utils.ts.
+// Reuses llmeval.LineRegex directly (the pattern-building logic that was
+// briefly duplicated locally here — see git history commit bc400fe4 — is
+// now consolidated into one definition now that internal/skeptic/llmeval
+// exists on this branch, per the follow-up tracked in bead jleechan-xpz7).
+// Distinct from llmeval.StrictVerdictRegex (PASS|FAIL only, used to
+// validate raw headless-tool output before accepting it into the fallback
+// chain) — this one accepts SKIPPED too, since it's used to parse LLM
+// output / GitHub comment bodies where SKIPPED is a legitimate terminal
+// verdict, not an infra-failure sentinel.
+var VerdictLineRegex = llmeval.LineRegex([]string{"PASS", "FAIL", "SKIPPED"})
 
 // HasSkepticRequestId reports whether body contains a
 // skeptic-request-id-<requestId> marker. Mirrors hasSkepticRequestId in
